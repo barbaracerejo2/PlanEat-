@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#193b30">
+<title>NutriLife</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f4f6f2;color:#25372e;font-family:-apple-system,BlinkMacSystemFont,sans-serif}
+header{background:#193b30;color:white;padding:25px 20px 28px;border-radius:0 0 25px 25px}
+header h1{margin:0;font-size:27px}
+header p{color:#d4e4d9;font-size:13px}
+main{padding:17px;max-width:600px;margin:auto}
+.card{background:white;padding:17px;border-radius:17px;margin-bottom:13px;box-shadow:0 2px 9px #00000008}
+.summary{background:#e2eee5;border-radius:14px;padding:15px;margin-top:18px}
+.big{font-size:30px;font-weight:750;color:#26734f}
+.muted{color:#78877d;font-size:13px}
+.meal{margin-bottom:12px}
+.meal h3{margin:0 0 8px;font-size:16px}
+.meal p{font-size:13px;color:#65756b;line-height:1.5}
+select,input{width:100%;padding:11px;border:1px solid #dce4dd;border-radius:10px;background:#fff;color:#25372e;font-size:14px;margin:5px 0 9px}
+.check{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:14px}
+.check input{width:20px;height:20px;accent-color:#278354;margin:0}
+.progress{height:10px;background:#d7e2d9;border-radius:20px;overflow:hidden;margin:10px 0}
+#bar{height:100%;width:0;background:#32865b;transition:width .2s}
+button{border:0;border-radius:10px;padding:12px;background:#193b30;color:white;font-size:14px;font-weight:600}
+button.secondary{background:#e4ece5;color:#254b37}
+footer{text-align:center;color:#849187;font-size:12px;padding:20px}
+</style>
+</head>
+<body>
+<header>
+<h1>🍏 NutriLife</h1>
+<p>Come bem. Vive melhor.</p>
+<div class="summary">
+<div class="muted">Calorias consumidas</div>
+<div class="big" id="total">0 kcal</div>
+<div class="muted" id="remaining">Plano estimado: 1.390 kcal</div>
+<div class="progress"><div id="bar"></div></div>
+<div class="muted" id="count">0 de 6 refeições cumpridas</div>
+</div>
+</header>
+<main>
+<div class="card">
+<strong>📅 Escolhe o teu dia</strong>
+<input type="date" id="day">
+<p class="muted">Os registos são guardados por dia neste iPhone.</p>
+</div>
+
+<div id="meals"></div>
+
+<div class="card">
+<strong>📊 Resumo diário</strong>
+<p class="muted" id="summary">Ainda não registaste refeições.</p>
+<button class="secondary" onclick="resetDay()">Reiniciar este dia</button>
+</div>
+</main>
+<footer>NutriLife · O teu diário alimentar</footer>
+
+<script>
+const meals=[
+{name:"Pequeno-almoço",kcal:300,description:"50 g pão de mistura · 5 g manteiga · 20 g queijo light · 200 ml Mimosa Light chocolate"},
+{name:"Meio da manhã",options:[
+["25 g Marinheiras",110],
+["Iogurte natural (125 g)",80],
+["Barra de cereais",100]
+]},
+{name:"Almoço",kcal:400,protein:[
+["Carne branca", "100 g"],
+["Carne vermelha magra","100 g"],
+["Peixe magro","120 g"],
+["Peixe gordo","80 g"]
+],carbs:[
+["Arroz cozido","100 g"],
+["Massa cozida","100 g"],
+["Batata cozida","150 g"],
+["Legumes + azeite (150 g + 5 g)",""]
+]},
+{name:"Lanche",kcal:250,description:"50 g pão de mistura · 5 g manteiga · 20 g queijo light · 200 ml Compal Light"},
+{name:"Jantar",kcal:260,protein:[
+["Carne branca","100 g"],
+["Carne vermelha magra","100 g"],
+["Peixe magro","120 g"],
+["Peixe gordo","80 g"]
+],carbs:[
+["Arroz cozido","80 g"],
+["Massa cozida","80 g"],
+["Batata cozida","120 g"],
+["Legumes + azeite (150 g + 5 g)",""]
+]},
+{name:"Doce da noite",options:[
+["Mini chocolate ou mini gelado",70],
+["Açaí Natura 0% (80 g) + Molico Light Zero (8 g)",68]
+]}
+];
+
+const today=new Date();
+const dateString=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const day=document.getElementById("day");
+day.value=dateString(today);
+let data={};
+
+function key(){return "nutrilife-"+day.value}
+function load(){
+try{data=JSON.parse(localStorage.getItem(key()))||{}}
+catch(e){data={}}
+render();
+}
+function save(){localStorage.setItem(key(),JSON.stringify(data));update()}
+function optionHTML(options,selected){
+return options.map((o,i)=>`<option value="${i}" ${Number(selected||0)===i?"selected":""}>${o[0]}${o[1]?" · "+o[1]+" kcal":""}</option>`).join("");
+}
+function render(){
+document.getElementById("meals").innerHTML=meals.map((m,i)=>{
+let d=data[i]||{};
+let content=m.description?`<p>${m.description}</p>`:"";
+if(m.options){
+content+=`<select onchange="choose(${i},this.value)">${optionHTML(m.options,d.choice||0)}</select>`;
+}
+if(m.protein){
+content+=`<label class="muted">Proteína</label><select onchange="setChoice(${i},'protein',this.value)">${m.protein.map((o,j)=>`<option value="${j}" ${Number(d.protein||0)===j?"selected":""}>${o[0]} — ${o[1]}</option>`).join("")}</select>`;
+content+=`<label class="muted">Hidratos / acompanhamento</label><select onchange="setChoice(${i},'carbs',this.value)">${m.carbs.map((o,j)=>`<option value="${j}" ${Number(d.carbs||0)===j?"selected":""}>${o[0]} ${o[1]}</option>`).join("")}</select>`;
+content+=`<p>Legumes: 150 g · Azeite: 5 g (conforme o plano)</p>`;
+}
+let kcal=m.options?m.options[Number(d.choice||0)][1]:m.kcal;
+return `<div class="card meal">
+<h3>${i+1}. ${m.name} <span class="muted">· ${kcal} kcal</span></h3>
+${content}
+<label class="check"><input type="checkbox" ${d.done?"checked":""} onchange="toggle(${i},this.checked)"> Já comi / Cumpri</label>
+</div>`;
+}).join("");
+update();
+}
+function choose(i,v){data[i]=data[i]||{};data[i].choice=Number(v);save();render()}
+function setChoice(i,type,v){data[i]=data[i]||{};data[i][type]=Number(v);save()}
+function toggle(i,v){data[i]=data[i]||{};data[i].done=v;save()}
+function update(){
+let total=0,count=0,planned=0;
+meals.forEach((m,i)=>{
+let d=data[i]||{};
+let kcal=m.options?m.options[Number(d.choice||0)][1]:m.kcal;
+planned+=kcal;
+if(d.done){total+=kcal;count++}
+});
+document.getElementById("total").textContent=total+" kcal";
+document.getElementById("remaining").textContent="Plano estimado: "+planned+" kcal";
+document.getElementById("count").textContent=count+" de 6 refeições cumpridas";
+document.getElementById("bar").style.width=(planned?Math.min(100,total/planned*100):0)+"%";
+document.getElementById("summary").textContent=count===6?"Parabéns! Assinalaste as seis refeições.": "Já cumpriste "+count+" refeições. Faltam "+(6-count)+".";
+}
+function resetDay(){
+if(confirm("Queres apagar os registos deste dia?")){
+data={};save();render();
+}
+}
+day.addEventListener("change",load);
+load();
+</script>
+</body>
+</html>
